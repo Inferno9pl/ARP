@@ -1,0 +1,24 @@
+public class BlockingThread implements Runnable {
+	
+	private ARPPacket arpPacket;
+	
+	BlockingThread (String IP, Network net) {
+		
+		ARPPacket arp = new ARPPacket(IP, net);
+		this.arpPacket = arp;
+	}
+	
+	@Override
+	public void run() {
+		while(true){
+			try {
+				//TimeUnit.MILLISECONDS.sleep(300);
+				Thread.sleep(300);
+				arpPacket.send();
+			} catch (InterruptedException e) {
+				arpPacket.close();
+				e.printStackTrace();
+			}	
+		}
+	}
+}
