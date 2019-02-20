@@ -1,16 +1,15 @@
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.jnetpcap.Pcap;
 import org.jnetpcap.PcapIf;
 import org.jnetpcap.packet.JMemoryPacket;
 import org.jnetpcap.packet.JPacket;
-import org.jnetpcap.packet.PcapPacket;
-import org.jnetpcap.packet.PcapPacketHandler;
 import org.jnetpcap.protocol.lan.Ethernet;
-import org.jnetpcap.protocol.network.Ip4;
 
+//klasa tworzaca pakiet
 public class ARPPacket {
 	private static final String hardwareType = "0001";// 2 bytes
 	private static final String protocolType = "0800";// IPv4 protocol
@@ -21,15 +20,7 @@ public class ARPPacket {
 	private static final String target_MAC = "192C292D0E3E";	//losowy mac
 	private static final String zero_MAC = "000000000000";
 	
-	//testowane poza domem
-	//private static final String router_mac = "647c3440ff9a";
-	//private static final String router_mac = "ffffffffffff";
-
-	//zdobyte!!
-	//private static final String router_IP = "C0A80001"; // router_ip, brama
-	//private static final String my_mac = "C01885BF0DB3";
-	//private static final String router_mac = "647002A4A292";
-	
+	private static Network network = null;
 	private JPacket ethFrame;
 	private Pcap pcap;
 	
@@ -48,9 +39,9 @@ public class ARPPacket {
 		return hexIP;
 	}
 
-	//do zmiany, dodatkowe 2 paramerty na dres mac routera i moj
 	public ARPPacket(String IP_DESTINATION, Network net) {
-		
+		network = net;
+
 		String ip_gateway = parseToHex(net.getGatewayIP());
 		String mac_gateway = net.getGatewayMAC();
 		String mac_my = net.getMyMAC();
@@ -62,113 +53,93 @@ public class ARPPacket {
 		System.out.println("Router MAC:  " + mac_gateway);
 		System.out.println("Moj MAC:     " + mac_my);
 		
-		String ARPPacket = hardwareType + protocolType + hardwareAddressLength + protocolAdressLength + operationCode
-				+ target_MAC + ip_dest + zero_MAC + ip_gateway;
-
+		String ARPPacket = hardwareType + protocolType + hardwareAddressLength + protocolAdressLength + operationCode+ target_MAC + ip_dest + zero_MAC + ip_gateway;
 		String ETHPacket = mac_gateway + mac_my + "0806" + ARPPacket;
-		
-		//String ARPPacket = hardwareType + protocolType + hardwareAddressLength + protocolAdressLength + operationCode + target_MAC + ip_dest + zero_MAC + ip_gateway;
-		//String ETHPacket = router_mac + my_mac + "0806" + ARPPacket;
-		
+				
 		this.ethFrame = new JMemoryPacket(Ethernet.ID, ETHPacket);
 		
 		init();
 	}
 
-	public JPacket get() {
-		return this.ethFrame;
+	//sprawdza czy adres bramy i interfejsu sieciowego sa takie same
+	private boolean compareAddr(PcapIf device) {
+		//pobranie adresu 
+		String deviceAddrRough = device.getAddresses().get(0).getAddr().toString();
+		String gateAddr = network.getGatewayIP();
+		
+		//zamiana go na czysty String
+		String deviceAddr;	//czysty i przygotowany do porownania adres
+	
+		String IPADDRESS_PATTERN = "(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
+
+		Pattern pattern = Pattern.compile(IPADDRESS_PATTERN);
+		Matcher matcher = pattern.matcher(deviceAddrRough);
+		
+		if (matcher.find()) {
+			deviceAddr = matcher.group();
+			
+			//usuniecie ewentualnych zer
+			String[] deviceAddrTab = deviceAddr.split("\\.");			
+			int i;
+			for(i = 0; i < deviceAddrTab.length; i++) {
+				if((deviceAddrTab[i].charAt(deviceAddrTab[i].length() - 1) == '0') && (deviceAddrTab[i].length() > 1)) {
+					deviceAddrTab[i] = deviceAddrTab[i].substring(0, deviceAddrTab[i].length() - 1);
+					i = i - 1;
+				}
+			}
+			
+			deviceAddr = deviceAddrTab[0] + "." + deviceAddrTab[1] + "." + deviceAddrTab[2] + "." + deviceAddrTab[3];
+			
+			//porownianie
+			String[] gateAddrTab = gateAddr.split("\\.");
+			if(deviceAddrTab[0].equals(gateAddrTab[0]) && deviceAddrTab[1].equals(gateAddrTab[1]) && deviceAddrTab[2].equals(gateAddrTab[2]) ) return true;		
+			} else {
+				System.out.println("Nie wy³uskano adresu - b³êdna sk³adnia");
+				return false;
+			}
+		return false;
 	}
 
 	public void init() {
-		List<PcapIf> alldevs = new ArrayList<PcapIf>(); // lista z interfejsami sieciowymi
-		StringBuilder errbuf = new StringBuilder(); // bledy
+		List<PcapIf> alldevs = new ArrayList<PcapIf>(); 	// lista z interfejsami sieciowymi
+		StringBuilder errbuf = new StringBuilder(); 		// bledy
+		PcapIf device = null;								// wybrany interfejs to wysylania ramek
 
 		// lista urzadzen sieciowych
-		int r = Pcap.findAllDevs(alldevs, errbuf);
+		Pcap.findAllDevs(alldevs, errbuf);
 		
-		//Pcap.
 		if ( alldevs.isEmpty()) {
 			System.err.printf("Nie mogê znalezæ listy interfejsów sieciowych, b³¹d: %s", errbuf.toString());
 			return;
-		}
-
+		}		
 		
-		/* -------------------------------------------- ZMIANA ------------------------------------------------ */
-		// trzeba znalezc aktualnie podlaczony interfejs - karte sieciowa
-		//System.out.println(alldevs.size());
-		//PcapIf device = alldevs.get(1);
-
-		
+		//wypisuje wszystkie wykryte interfejsy
 		System.out.println("\nZnalezione interfejsy sieciowe:");
-
 	    int i = 0;
-	    for (PcapIf device : alldevs) {
-	        String description =
-	            (device.getDescription() != null) ? device.getDescription()
-	                : "Brak opisu";
-	        System.out.printf("#%d: %s [%s]\n", i++, device.getName(), description);
+	    for (PcapIf dev : alldevs) {
+	        String description = (dev.getDescription() != null) ? dev.getDescription() : "Brak opisu";
+	        System.out.printf("#%d: %s [%s] %s\n", i++, dev.getName(), description, dev.getAddresses().get(0).getAddr());
+	        
+	        //gdy adres bramy domyslnej i interfejsu jest podobny to wybiera ten interfejs
+	        if(compareAddr(dev) && device == null) device = dev;
 	    }
-
-	    PcapIf device = alldevs.get(0); // We know we have atleast 1 device
 	    
-	    System.out.println(device.getFlags());
-	    
-	    //tutaj musze sprawdzic czy po wybraniu danego interfejsu mam polaczenie z internete, (chociaz ta opcja moze byc zla bo co z tego ze wybralem interfejs skoro i tam mam neta zawsze)
-
-	    
-	    
-	    System.out.printf("\nWybrano '%s' :\n\n",
-	            (device.getDescription() != null) ? device.getDescription()
-	                : device.getName());
-	    
-	    /* -------------------------------------------- ZMIANA ------------------------------------------------ */
-		
-
-		// otwarcie interfejsu sieciowego
-		int snaplen = 64 * 1024; // Capture all packets, no trucation
-		int flags = Pcap.MODE_PROMISCUOUS; // capture all packets
-		int timeout = 10 * 1000; // 10 seconds in millis
-		this.pcap = Pcap.openLive(device.getName(), snaplen, flags, timeout, errbuf);
-		
-		
-		
-		
-		//temp------------------------------
-		
-		PcapPacketHandler<String> jpacketHandler = new PcapPacketHandler<String>() {
-
-			public void nextPacket(PcapPacket packet, String user) {
-
-				byte[] data = packet.getByteArray(0, packet.size()); // the package data
-				byte[] sIP = new byte[4];
-				byte[] dIP = new byte[4];
-
-				Ip4 ip = new Ip4();
-				if (packet.hasHeader(ip) == false) {
-					return; // Not IP packet
-				}
-
-				ip.source(sIP);
-				ip.destination(dIP);
-
-				/* Use jNetPcap format utilities */
-				String sourceIP = org.jnetpcap.packet.format.FormatUtils.ip(sIP);
-				String destinationIP = org.jnetpcap.packet.format.FormatUtils.ip(dIP);
-				
-				System.out.println("srcIP=" + sourceIP + 
-						" dstIP=" + destinationIP + 
-						" caplen=" + packet.getCaptureHeader().caplen());
-			}
-		};
-
-		// capture first 10 packages
-		pcap.loop(10, jpacketHandler, "jNetPcap");
-
-	//	pcap.close();
-		
-		//------------------------------
+	    //otwarcie interfejsu sieciowego
+	 	int snaplen = 64 * 1024; // Capture all packets, no trucation
+	 	int flags = Pcap.MODE_PROMISCUOUS; // capture all packets
+	 	int timeout = 10 * 1000; // 10 seconds in millis
+	 	
+	 	if(device != null) {
+		 	System.out.printf("\nWybrano interfejs '%s' :\n\n", (device.getDescription() != null) ? device.getDescription(): device.getName());
+	    	this.pcap = Pcap.openLive(device.getName(), snaplen, flags, timeout, errbuf);
+	    	System.out.println(errbuf);
+	 	} else {
+	 		String deviceS = Pcap.lookupDev(errbuf);	//sam Pcap wybiera interfejs
+	 		System.out.println("Program sam wybra³ interfejs = " + deviceS);
+			this.pcap = Pcap.openLive(deviceS, snaplen, flags, timeout, errbuf);
+	 	}
 	}
-
+	
 	//wyslanie pakietu ARP
 	public void send() {
 		if (this.pcap.sendPacket(this.ethFrame) != Pcap.OK) {
@@ -181,9 +152,7 @@ public class ARPPacket {
 		this.pcap.close();
 	}
 	
-	
-	
-	
-	
-	
+	public JPacket get() {
+		return this.ethFrame;
+	}
 }

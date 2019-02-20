@@ -1,5 +1,4 @@
 public class BlockingThread implements Runnable {
-	
 	private ARPPacket arpPacket;
 	
 	BlockingThread (String IP, Network net) {
@@ -12,7 +11,6 @@ public class BlockingThread implements Runnable {
 	public void run() {
 		while(true){
 			try {
-				//TimeUnit.MILLISECONDS.sleep(300);
 				Thread.sleep(300);
 				arpPacket.send();
 			} catch (InterruptedException e) {

@@ -327,15 +327,12 @@ public class Arp_atack extends JFrame {
 	public Network getNetwork() {
 		return net;
 	}
-	
-
 }
 
 /*
- * IMPORTANT - PcapIf device = alldevs.get(0); w ARPPacket - trzeba wyszuac aktualnie uzywanego interfejsu a nie wybierac, bo
- * get(1) w moim przypadku wybiera interfejs wifi gdy po kablu jest wlaczone! jak karta sieciowa lan jest wylaczona to juz jest problem
- * 
  * odwiezac czale network towrzac go od nowa (moze to this.net zamiast net w refersh?)
+ * konczenie watkow nie poprzez stop(), a zmiane parametru do ktorego maja dostep, aby same zauwazyly ze maja sie zakonczyc
+ * 
  * scrollbar do listy
  * musze przeszukac siec recznie bo dopoki nie wysle czegokolwiek do kazdego to arp bedzie niepelny. Np nie znajduje tabletu bo nic z nim nie wymienialem danych.
  * trzeba przejsc po calym zakresie sieci i wysylac pingi albo moze cos szybszego?
