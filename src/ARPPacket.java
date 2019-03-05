@@ -24,6 +24,8 @@ public class ARPPacket {
 	private JPacket ethFrame;
 	private Pcap pcap;
 	
+	private String packetInfo = "";
+	
 	//zamiana z zapisu z kropkami na szesnastkowy
 	private String parseToHex(String IP) {
 		String[] temp = IP.split("\\.");
@@ -53,10 +55,12 @@ public class ARPPacket {
 		System.out.println("Router MAC:  " + mac_gateway);
 		System.out.println("Moj MAC:     " + mac_my);
 		
-		String ARPPacket = hardwareType + protocolType + hardwareAddressLength + protocolAdressLength + operationCode+ target_MAC + ip_dest + zero_MAC + ip_gateway;
+		String ARPPacket = hardwareType + protocolType + hardwareAddressLength + protocolAdressLength + operationCode + target_MAC + ip_dest + zero_MAC + ip_gateway;
 		String ETHPacket = mac_gateway + mac_my + "0806" + ARPPacket;
 				
 		this.ethFrame = new JMemoryPacket(Ethernet.ID, ETHPacket);
+		
+		this.packetInfo = "ARP Packet Info: \n" + "ADDR DEST: " + ip_dest + "\nIP GATEWAY: " + ip_gateway + "\nMAC GATEWAY: " + mac_gateway + " " + " " ;
 		
 		init();
 	}

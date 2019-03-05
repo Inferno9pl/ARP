@@ -9,9 +9,10 @@ public class BlockingThread implements Runnable {
 	
 	@Override
 	public void run() {
+		System.out.println(this.arpPacket.toString());
 		while(true){
 			try {
-				Thread.sleep(300);
+				Thread.sleep(200);
 				arpPacket.send();
 			} catch (InterruptedException e) {
 				arpPacket.close();
